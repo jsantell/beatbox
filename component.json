@@ -1,0 +1,13 @@
+{
+  "name" : "beatbox",
+  "version": "0.1.0",
+  "main": "./public/index.html",
+  "dependencies": {
+    "jquery" : "*",
+    "underscore" : "*",
+    "backbone" : "*",
+    "bootstrap" : "*",
+    "allen" : "*",
+    "handlebars" : "*"
+  }
+}

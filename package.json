@@ -1,0 +1,9 @@
+{
+  "name": "beatbox",
+  "version": "0.1.0",
+  "description": "",
+  "main": "",
+  "devDependencies": {
+    "grunt-contrib" : "latest"
+  }
+}
