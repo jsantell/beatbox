@@ -8,6 +8,7 @@
     "backbone" : "*",
     "bootstrap" : "*",
     "allen" : "*",
+    "dsp.js" : "*",
     "handlebars" : "*"
   }
 }
