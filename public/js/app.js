@@ -17,6 +17,8 @@ this["app"]["templates"]["intro"] = function (Handlebars,depth0,helpers,partials
 (function () {
   app.models.AudioInput = Backbone.Model.extend({
 
+    KICK : { low: 0, high: 500 },
+    SNARE : { low: 700, high: 5000 },
     THRESHOLD : 0.15,
     BUFFER_SIZE : 2048,
     DECAY : 0.25,
@@ -42,7 +44,6 @@ this["app"]["templates"]["intro"] = function (Handlebars,depth0,helpers,partials
     processAudio : function ( e ) {
       this.wait -= this.DECAY;
       this.fft.forward( e.inputBuffer.getChannelData( 0 ));
-      console.log(this.fft.spectrum[0]);
       this.detectSound( this.fft.spectrum );
     },
 
@@ -55,12 +56,10 @@ this["app"]["templates"]["intro"] = function (Handlebars,depth0,helpers,partials
       if ( centroid > 0 ) {
         console.log( 'Centroid: ' + centroid );
       }
-      if ( centroid < 500 ) {
+      if ( centroid >= this.KICK.low && centroid <= this.KICK.high ) {
         this.wait = 1;
-        console.log('kick');
         this.trigger( 'kick' );
-      } else if ( centroid > 700 && centroid < 5000 ) {
-        console.log('snare');
+      } else if ( centroid >= this.SNARE.low && centroid <= this.SNARE.high ) {
         this.wait = 1;
         this.trigger( 'snare' );
       }
@@ -75,7 +74,6 @@ this["app"]["templates"]["intro"] = function (Handlebars,depth0,helpers,partials
         sumFX += fn * xn;
         sumX += xn;
       }
-      console.log(sumFX,sumX);
       return sumFX / sumX;
     },
 

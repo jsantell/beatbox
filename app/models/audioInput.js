@@ -40,10 +40,10 @@
       if ( centroid > 0 ) {
         console.log( 'Centroid: ' + centroid );
       }
-      if ( centroid >= KICK.low && centroid <= KICK.high ) {
+      if ( centroid >= this.KICK.low && centroid <= this.KICK.high ) {
         this.wait = 1;
         this.trigger( 'kick' );
-      } else if ( centroid >= SNARE.low && centroid <= SNARE.high ) {
+      } else if ( centroid >= this.SNARE.low && centroid <= this.SNARE.high ) {
         this.wait = 1;
         this.trigger( 'snare' );
       }
