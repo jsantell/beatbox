@@ -15,10 +15,10 @@ this["app"]["templates"]["intro"] = function (Handlebars,depth0,helpers,partials
 
   return "<div>\n  This is how this works.\n</div>\n";};
 (function () {
-  app.models.Input = Backbone.Model.extend({
+  app.models.AudioInput = Backbone.Model.extend({
   
     initialize : function () {
-      console.log( 'initialized' );
+    
     }
 
   });
@@ -26,9 +26,12 @@ this["app"]["templates"]["intro"] = function (Handlebars,depth0,helpers,partials
 
 (function () {
   app.models.sample = Backbone.Model.extend({
+    
     initialize : function () {
+      this.loadSample();
+    },
 
-    }
+    
   });
 })();
 
@@ -66,7 +69,9 @@ app.init = function () {
   app.introView = new app.views.Intro();
 
   app.context = allen.getAudioContext();
-  app.input = new app.models.Input();
+  app.audioInput = new app.models.AudioInput({
+    context : app.context
+  });
 
   $( '#content' )
     .append( app.introView.render().$el );
@@ -74,5 +79,5 @@ app.init = function () {
 
 $(function () {
   app.init.call( app );
-  Backbone.history.start();
+//  Backbone.history.start();
 });

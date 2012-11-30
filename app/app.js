@@ -2,7 +2,9 @@ app.init = function () {
   app.introView = new app.views.Intro();
 
   app.context = allen.getAudioContext();
-  app.input = new app.models.Input();
+  app.audioInput = new app.models.AudioInput({
+    context : app.context
+  });
 
   $( '#content' )
     .append( app.introView.render().$el );

@@ -1,8 +1,8 @@
 (function () {
-  app.models.Input = Backbone.Model.extend({
+  app.models.AudioInput = Backbone.Model.extend({
   
     initialize : function () {
-      console.log( 'initialized' );
+    
     }
 
   });
