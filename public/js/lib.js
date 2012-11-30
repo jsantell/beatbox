@@ -9471,6 +9471,694 @@ if ( typeof define === "function" && define.amd && define.amd.jQuery ) {
 
 })( window );
 
+/*
+Copyright (c) 2012 Juan Mellado
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+
+/*
+References:
+- "OpenCV: Open Computer Vision Library"
+  http://sourceforge.net/projects/opencvlibrary/
+*/
+
+var CV = CV || {};
+
+CV.Image = function(width, height, data){
+  this.width = width || 0;
+  this.height = height || 0;
+  this.data = data || [];
+};
+
+CV.findContours = function(imageSrc){
+  var contours = [], src = imageSrc.data,
+      width = imageSrc.width - 2, height = imageSrc.height - 2,
+      pos = width + 3, nbd = 1,
+      deltas, pix, outer, hole, i, j;
+
+  deltas = CV.neighborhoodDeltas(width + 2);
+
+  for (i = 0; i < height; ++ i, pos += 2){
+  
+    for (j = 0; j < width; ++ j, ++ pos){
+      pix = src[pos];
+
+      if (0 !== pix){
+        outer = hole = false;
+
+        if (1 === pix && 0 === src[pos - 1]){
+          outer = true;
+        }
+        else if (pix >= 1 && 0 === src[pos + 1]){
+          hole = true;
+        }
+
+        if (outer || hole){
+          ++ nbd;
+          
+          contours.push( CV.borderFollowing(src, pos, nbd,
+            {x: j, y: i}, hole, deltas) );
+        }
+      }
+    }
+  }  
+
+  return contours;
+};
+
+CV.borderFollowing = function(src, pos, nbd, point, hole, deltas){
+  var contour = [], pos1, pos3, pos4, s, s_end, s_prev;
+
+  contour.hole = hole;
+      
+  s = s_end = hole? 0: 4;
+  do{
+    s = (s - 1) & 7;
+    pos1 = pos + deltas[s];
+    if (src[pos1] !== 0){
+      break;
+    }
+  }while(s !== s_end);
+  
+  if (s === s_end){
+    src[pos] = -nbd;
+    contour.push( {x: point.x, y: point.y} );
+
+  }else{
+    pos3 = pos;
+    s_prev = s ^ 4;
+
+    while(true){
+      s_end = s;
+    
+      do{
+        pos4 = pos3 + deltas[++ s];
+      }while(src[pos4] === 0);
+      
+      s &= 7;
+      
+      if ( ( (s - 1) >>> 0) < (s_end >>> 0) ){
+        src[pos3] = -nbd;
+      }
+      else if (src[pos3] === 1){
+        src[pos3] = nbd;
+      }
+
+      contour.push( {x: point.x, y: point.y} );
+      
+      s_prev = s;
+
+      point.x += CV.neighborhood[s][0];
+      point.y += CV.neighborhood[s][1];
+
+      if ( (pos4 === pos) && (pos3 === pos1) ){
+        break;
+      }
+      
+      pos3 = pos4;
+      s = (s + 4) & 7;
+    }
+  }
+
+  return contour;
+};
+
+CV.neighborhood = 
+  [ [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1] ];
+
+CV.neighborhoodDeltas = function(width){
+  var deltas = [], len = CV.neighborhood.length, i = 0;
+  
+  for (; i < len; ++ i){
+    deltas[i] = CV.neighborhood[i][0] + (CV.neighborhood[i][1] * width);
+  }
+  
+  return deltas.concat(deltas);
+};
+
+CV.approxPolyDP = function(contour, epsilon){
+  var slice = {start_index: 0, end_index: 0},
+      right_slice = {start_index: 0, end_index: 0},
+      poly = [], stack = [], len = contour.length,
+      pt, start_pt, end_pt, dist, max_dist, le_eps,
+      dx, dy, i, j, k;
+  
+  epsilon *= epsilon;
+  
+  k = 0;
+  
+  for (i = 0; i < 3; ++ i){
+    max_dist = 0;
+    
+    k = (k + right_slice.start_index) % len;
+    start_pt = contour[k];
+    if (++ k === len) {k = 0;}
+  
+    for (j = 1; j < len; ++ j){
+      pt = contour[k];
+      if (++ k === len) {k = 0;}
+    
+      dx = pt.x - start_pt.x;
+      dy = pt.y - start_pt.y;
+      dist = dx * dx + dy * dy;
+
+      if (dist > max_dist){
+        max_dist = dist;
+        right_slice.start_index = j;
+      }
+    }
+  }
+
+  if (max_dist <= epsilon){
+    poly.push( {x: start_pt.x, y: start_pt.y} );
+
+  }else{
+    slice.start_index = k;
+    slice.end_index = (right_slice.start_index += slice.start_index);
+  
+    right_slice.start_index -= right_slice.start_index >= len? len: 0;
+    right_slice.end_index = slice.start_index;
+    if (right_slice.end_index < right_slice.start_index){
+      right_slice.end_index += len;
+    }
+    
+    stack.push( {start_index: right_slice.start_index, end_index: right_slice.end_index} );
+    stack.push( {start_index: slice.start_index, end_index: slice.end_index} );
+  }
+
+  while(stack.length !== 0){
+    slice = stack.pop();
+    
+    end_pt = contour[slice.end_index % len];
+    start_pt = contour[k = slice.start_index % len];
+    if (++ k === len) {k = 0;}
+    
+    if (slice.end_index <= slice.start_index + 1){
+      le_eps = true;
+    
+    }else{
+      max_dist = 0;
+
+      dx = end_pt.x - start_pt.x;
+      dy = end_pt.y - start_pt.y;
+      
+      for (i = slice.start_index + 1; i < slice.end_index; ++ i){
+        pt = contour[k];
+        if (++ k === len) {k = 0;}
+        
+        dist = Math.abs( (pt.y - start_pt.y) * dx - (pt.x - start_pt.x) * dy);
+
+        if (dist > max_dist){
+          max_dist = dist;
+          right_slice.start_index = i;
+        }
+      }
+      
+      le_eps = max_dist * max_dist <= epsilon * (dx * dx + dy * dy);
+    }
+    
+    if (le_eps){
+      poly.push( {x: start_pt.x, y: start_pt.y} );
+
+    }else{
+      right_slice.end_index = slice.end_index;
+      slice.end_index = right_slice.start_index;
+
+      stack.push( {start_index: right_slice.start_index, end_index: right_slice.end_index} );
+      stack.push( {start_index: slice.start_index, end_index: slice.end_index} );
+    }
+  }
+  
+  return poly;
+};
+
+CV.erode = function(imageSrc, imageDst){
+  return CV.applyKernel(imageSrc, imageDst, Math.min);
+};
+    
+CV.dilate = function(imageSrc, imageDst){
+  return CV.applyKernel(imageSrc, imageDst, Math.max);
+};
+    
+CV.applyKernel = function(imageSrc, imageDst, fn){
+  var src = imageSrc.data, dst = imageDst.data,
+      width = imageSrc.width, height = imageSrc.height,
+      offsets = [-width - 1, -width, -width + 1, -1, 1, width - 1, width, width + 1],
+      klen = offsets.length,
+      pos = 0, value, i, j, k;
+  
+  for (i = 0; i < width; ++ i){
+    dst[pos ++] = 0;
+  }
+
+  for (i = 2; i < height; ++ i){
+    dst[pos ++] = 0;
+
+    for (j = 2; j < width; ++ j){
+      value = src[pos];
+      
+      for (k = 0; k < klen; ++ k){
+        value = fn(value, src[ pos + offsets[k] ] );
+      }
+      
+      dst[pos ++] = value;
+    }
+    
+    dst[pos ++] = 0;
+  }
+
+  for (i = 0; i < width; ++ i){
+    dst[pos ++] = 0;
+  }
+
+  imageDst.width = imageSrc.width;
+  imageDst.height = imageSrc.height;
+  
+  return imageDst;
+};
+
+CV.convexHull = function(points){
+  var deque = [], i = 3, point;
+
+  if (points.length >= 3){
+
+    if ( CV.position(points[0], points[1], points[2]) > 0){
+      deque.push(points[0]);
+      deque.push(points[1]);
+    }else{
+      deque.push(points[1]);
+      deque.push(points[0]);
+    }
+    deque.push(points[2]);
+    deque.unshift(points[2]);
+
+    for (; i < points.length; ++ i){
+      point = points[i];
+
+      if ( CV.position(point, deque[0], deque[1]) < 0 ||
+           CV.position(deque[deque.length - 2], deque[deque.length - 1], point) < 0 ){
+           
+        while( CV.position(deque[deque.length - 2], deque[deque.length - 1], point) <= 0 ){
+          deque.pop();
+        }
+        deque.push(point);
+        
+        while( CV.position(point, deque[0], deque[1]) <= 0 ){
+          deque.shift();
+        }
+        deque.unshift(point);
+      }
+    }
+
+  }
+
+  return deque;
+};
+
+CV.position = function(p1, p2, p3){
+  return ( (p2.x - p1.x) * (p3.y - p1.y) ) - ( (p3.x - p1.x) * (p2.y - p1.y) );
+};
+
+CV.convexityDefects = function(points, hull){
+  var defects = [], len = hull.length,
+      curr, next, point, dx0, dy0, scale, defect, isDefect,
+      idx1, idx2, idx3, sign, inc, depth, dx, dy, dist, i, j;
+  
+  if (len >= 3){
+    idx1 = CV.indexPoint(points, hull[0]);
+    idx2 = CV.indexPoint(points, hull[1]);
+    idx3 = CV.indexPoint(points, hull[2]);
+    
+    sign = 0;
+    sign += idx2 > idx1? 1: 0;
+    sign += idx3 > idx2? 1: 0;
+    sign += idx1 > idx3? 1: 0;
+    
+    inc = (sign === 2)? 1: -1;
+    
+    j = idx1;
+    curr = hull[0];
+    
+    for (i = 1; i !== len; ++ i){
+      next = hull[i];
+      isDefect = false;
+      depth = 0;
+    
+      dx0 = next.x - curr.x;
+      dy0 = next.y - curr.y;
+      scale = 1 / Math.sqrt(dx0 * dx0 + dy0 * dy0);
+    
+      defect = {start: curr, end: next};
+
+      while(true){
+        j += inc;
+        j = (j < 0)? points.length - 1: j % points.length;
+        
+        point = points[j];
+        
+        if (point.x === next.x && point.y === next.y){
+          break;
+        }
+
+        dx = point.x - curr.x;
+        dy = point.y - curr.y;
+        dist = Math.abs(-dy0 * dx + dx0 * dy) * scale;
+      
+        if (dist > depth){
+          isDefect = true;
+          
+          defect.depth = depth = dist;
+          defect.depthPoint = point;
+        }
+      }
+      
+      if (isDefect){
+        defects.push(defect);
+      }
+      
+      curr = next;
+    }
+  }
+  
+  return defects;
+};
+
+CV.indexPoint = function(points, point){
+  var len = points.length, i = 0;
+  for (; i < len; ++ i){
+    if (points[i].x === point.x && points[i].y === point.y){
+      break;
+    }
+  }
+  return i;
+};
+
+CV.area = function(poly){
+  var area = 0, len = poly.length, i = 1,
+      x, y, xmin, xmax, ymin, ymax;
+
+  if (len > 0){
+    xmin = xmax = poly[0].x;
+    ymin = ymax = poly[0].y;
+  
+    for (; i < len; ++ i){
+      x = poly[i].x;
+      if (x < xmin){
+        xmin = x;
+      }
+      if (x > xmax){
+        xmax = x;
+      }
+      
+      y = poly[i].y;
+      if (y < ymin){
+        ymin = y;
+      }
+      if (y > ymax){
+        ymax = y;
+      }
+    }
+  
+    area = (xmax - xmin + 1) * (ymax - ymin + 1);
+  }
+  
+  return area;
+};
+
+/*
+Copyright (c) 2012 Juan Mellado
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+
+var HT = HT || {};
+
+HT.Tracker = function(params){
+  this.params = params || {};
+
+  this.mask = new CV.Image();
+  this.eroded = new CV.Image();
+  this.contours = [];
+  
+  this.skinner = new HT.Skinner();
+};
+
+HT.Tracker.prototype.detect = function(image){
+  this.skinner.mask(image, this.mask);
+  
+  if (this.params.fast){
+    this.blackBorder(this.mask);
+  }else{
+    CV.erode(this.mask, this.eroded);
+    CV.dilate(this.eroded, this.mask);
+  }
+
+  this.contours = CV.findContours(this.mask);
+
+  return this.findCandidate(this.contours, image.width * image.height * 0.05, 0.005);
+};
+
+HT.Tracker.prototype.findCandidate = function(contours, minSize, epsilon){
+  var contour, candidate;
+  
+  contour = this.findMaxArea(contours, minSize);
+  if (contour){
+    contour = CV.approxPolyDP(contour, contour.length * epsilon);
+  
+    candidate = new HT.Candidate(contour);
+  }
+  
+  return candidate;
+};
+
+HT.Tracker.prototype.findMaxArea = function(contours, minSize){
+  var len = contours.length, i = 0,
+      maxArea = -Infinity, area, contour;
+
+  for (; i < len; ++ i){
+    area = CV.area(contours[i]);
+    if (area >= minSize){
+    
+      if (area > maxArea) {
+        maxArea = area;
+      
+        contour = contours[i];
+      }
+    }
+  }
+  
+  return contour;
+};
+
+HT.Tracker.prototype.blackBorder = function(image){
+  var img = image.data, width = image.width, height = image.height,
+      pos = 0, i;
+
+  for (i = 0; i < width; ++ i){
+    img[pos ++] = 0;
+  }
+  
+  for (i = 2; i < height; ++ i){
+    img[pos] = img[pos + width - 1] = 0;
+
+    pos += width;
+  }
+
+  for (i = 0; i < width; ++ i){
+    img[pos ++] = 0;
+  }
+  
+  return image;
+};
+
+HT.Candidate = function(contour){
+  this.contour = contour;
+  this.hull = CV.convexHull(contour);
+  this.defects = CV.convexityDefects(contour, this.hull);
+};
+
+HT.Skinner = function(){
+};
+
+HT.Skinner.prototype.mask = function(imageSrc, imageDst){
+  var src = imageSrc.data, dst = imageDst.data, len = src.length,
+      i = 0, j = 0,
+      r, g, b, h, s, v, value;
+
+  for(; i < len; i += 4){
+    r = src[i];
+    g = src[i + 1];
+    b = src[i + 2];
+  
+    v = Math.max(r, g, b);
+    s = v === 0? 0: 255 * ( v - Math.min(r, g, b) ) / v;
+    h = 0;
+    
+    if (0 !== s){
+      if (v === r){
+        h = 30 * (g - b) / s;
+      }else if (v === g){
+        h = 60 + ( (b - r) / s);
+      }else{
+        h = 120 + ( (r - g) / s);
+      }
+      if (h < 0){
+        h += 360;
+      }
+    }
+    
+    value = 0;
+
+    if (v >= 15 && v <= 250){
+      if (h >= 3 && h <= 33){
+        value = 255;
+      }
+    }
+    
+    dst[j ++] = value;
+  }
+  
+  imageDst.width = imageSrc.width;
+  imageDst.height = imageSrc.height;
+  
+  return imageDst;
+};
+
+// SimpleReverb
+// Inspired by Matt Diamond's Synthjs Reverb: https://github.com/mattdiamond/synthjs
+
+(function ( root, factory ) {
+  if (typeof exports === 'object') {
+    module.exports = factory();
+  } else if (typeof define === 'function' && define.amd) {
+    define(factory);
+  } else {
+    root.SimpleReverb = factory();
+  }
+})(this, function () {
+
+  function SimpleReverb ( context, options ) {
+    options = options || {};
+
+    var _this = this;
+    this.context = context;
+    var convolver = this.context.createConvolver();
+
+    this.input = convolver;
+    this.output = convolver;
+
+    // Params
+
+    var seconds = {
+      name: 'seconds',
+      defaultValue: options.seconds || 3,
+      minValue: 1,
+      maxValue: 50
+    };
+
+    var decay = {
+      name: 'decay',
+      defaultValue: options.decay || 2,
+      minValue: 0,
+      maxValue: 100
+    };
+
+    var reverse = {
+      name: 'reverse',
+      defaultValue: options.reverse ? 1 : 0,
+      minValue: 0,
+      maxValue: 1
+    };
+
+    this.params = {
+      seconds: seconds,
+      decay: decay,
+      reverse: reverse
+    };
+
+    setupParams.call( this, this.params.seconds );
+    setupParams.call( this, this.params.decay );
+    setupParams.call( this, this.params.reverse );
+
+    createImpulse.call( this );
+  }
+
+  SimpleReverb.prototype.connect = function ( node ) {
+    this.output.connect( node && node.input ? node.input : node );
+  };
+
+  SimpleReverb.prototype.disconnect = function () {
+    this.output.disconnect();
+  };
+
+
+  function setupParams ( param ) {
+    var _this = this;
+    param.__value = param.value = param.defaultValue;
+    param.__defineGetter__( 'value', function () { return param.__value; });
+    param.__defineSetter__( 'value', function ( val ) {
+      param.__value = val;
+      createImpulse.call( _this );
+    });
+  }
+
+  function createImpulse () {
+    var rate = this.context.sampleRate;
+    var length = rate * this.params.seconds.value;
+    var decay = this.params.decay.value;
+    var reverse = this.params.reverse.value;
+
+    var impulse = this.context.createBuffer( 2, length, rate );
+    var impulseL = impulse.getChannelData( 0 );
+    var impulseR = impulse.getChannelData( 1 );
+    var n;
+
+    for ( var i = 0; i < length; i++ ) {
+      n = reverse ? length - i : i;
+      impulseL[ i ] = ( Math.random() * 2 - 1 ) * Math.pow( 1 - n / length, decay );
+      impulseR[ i ] = ( Math.random() * 2 - 1 ) * Math.pow( 1 - n / length, decay );
+    }
+
+    this.input.buffer = impulse;
+  }
+
+  return SimpleReverb;
+
+});
+
 /* 
  *  DSP.js - a comprehensive digital signal processing  library for javascript
  * 

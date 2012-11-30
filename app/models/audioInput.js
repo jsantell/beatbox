@@ -2,10 +2,10 @@
   app.models.AudioInput = Backbone.Model.extend({
 
     KICK : { low: 0, high: 500 },
-    SNARE : { low: 700, high: 5000 },
+    SNARE : { low: 1000, high: 5000 },
     THRESHOLD : 0.15,
-    BUFFER_SIZE : 2048,
-    DECAY : 0.25,
+    BUFFER_SIZE : 1024,
+    DECAY : 0.12,
 
     initialize : function () {
       var that = this;

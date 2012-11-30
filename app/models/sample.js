@@ -9,9 +9,14 @@
       this.audioInput = this.get( 'audioInput' );
       this.context = this.get( 'context' );
       this.triggerName = this.get( 'triggerName' );
+      this.destination = this.get( 'destination' );
 
       this.loadSample();
       this.audioInput.on( this.triggerName, this.play, this );
+    },
+
+    setKit : function ( kit ) {
+      this.setSample( kit + '_' + this.triggerName + '.wav' );
     },
 
     setSample : function ( path ) {
@@ -31,7 +36,7 @@
       console.log( 'playing ' + this.triggerName );
       this.bufferNode = this.context.createBufferSource();
       this.bufferNode.buffer = this.buffer;
-      this.bufferNode.connect( this.context.destination );
+      this.bufferNode.connect( this.destination );
       this.bufferNode.noteOn( 0 );
     }
 
