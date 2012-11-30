@@ -7,7 +7,7 @@
 
     initialize : function () {
       var that = this;
-
+      this.context = this.get( 'context');
       this.wait = 0;
 
       navigator.webkitGetUserMedia({ audio: true }, function ( stream ) {
@@ -24,46 +24,55 @@
     },
 
     processAudio : function ( e ) {
-      this.wait -= this.decay;
+      this.wait -= this.DECAY;
       this.fft.forward( e.inputBuffer.getChannelData( 0 ));
+      console.log(this.fft.spectrum[0]);
       this.detectSound( this.fft.spectrum );
     },
 
     detectSound : function ( signal ) {
       var centroid;
 
-      if ( wait > 0) { return; }
+      if ( this.wait > 0) { return; }
 
       centroid = this.spectralCentroid( signal );
       if ( centroid > 0 ) {
         console.log( 'Centroid: ' + centroid );
       }
       if ( centroid < 500 ) {
+        this.wait = 1;
+        console.log('kick');
         this.trigger( 'kick' );
       } else if ( centroid > 700 && centroid < 5000 ) {
+        console.log('snare');
+        this.wait = 1;
         this.trigger( 'snare' );
       }
     },
 
     spectralCentroid : function ( signal ) {
-      var xn, fn;
+      var xn, fn, sumFX = 0, sumX = 0;
+
       for ( var n = 0; n < signal.length; n++ ) {
         xn = Math.abs( signal[ n ] ) < this.THRESHOLD ? 0 : signal[ n ];
+        fn = this.nToFreq( n, this.context.sampleRate );
+        sumFX += fn * xn;
+        sumX += xn;
       }
-      fn = nToFreq( n, bufferSize, this.context.sampleRate );
-      return ( fn * xn ) / xn;
+      console.log(sumFX,sumX);
+      return sumFX / sumX;
     },
 
-    preCalcNToF : function ( bufferSize, sampleRate ) {
+    preCalcNToF : function ( sampleRate ) {
       var nToFPre = [];
-      for ( var i = 0; i < bufferSize; i++ ) {
-        nToFPre = this.nToFreq( i, bufferSize, sampleRate );
+      for ( var i = 0; i < this.BUFFER_SIZE; i++ ) {
+        nToFPre = this.nToFreq( i, sampleRate );
       }
       return nToFPre;
     },
 
-    nToFreq : function ( n, bufferSize, sampleRate ) {
-      return n * sampleRate / bufferSize;
+    nToFreq : function ( n, sampleRate ) {
+      return n * sampleRate / this.BUFFER_SIZE;
     }
 
   });
